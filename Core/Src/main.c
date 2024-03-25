@@ -94,15 +94,7 @@ uint32_t maxIndex[3]; //holds the indexes of FFT magnitudes at max values
 float32_t maxValue[3]; //holds the max values of FFT magnitudes
 
 //initialize frequency bins to search speech formants
-int bin100;
-int bin530;
-int bin1000;
-int bin2000;
-int bin2700;
-int bin4000;
-int bin4900;
-int bin5000;
-int bin6000;
+// !!! content excluded !!!
 int binCityCut; // LPF for city mode
 int binMusicCut; // LPF for music mode
 
@@ -129,196 +121,19 @@ float Ptemp;
 float prev_input;
 
 void proccessSpeechMode(){
-
-    int newbin;
-	float32_t fft100_1000[bin1000 - bin100 + 1]; //FFT buffer from 100Hz to 1kHz
-	float32_t fft530_2700[bin2700 - bin530 + 1]; //FFT buffer from 530Hz to 2.7kHz
-	float32_t fft2000_6000[bin6000 - bin2000 + 1]; //FFT buffer from 2kHz to 6kHz
-
-	float32_t BPF1[bin6000]; //bandpass filter for the first formant
-	float32_t BPF2[bin6000]; //bandpass filter for the second formant
-	float32_t BPF3[bin6000]; //bandpass filter for the third formant
-	float32_t TF[2*bin6000]; //combination of all the filters in a single buffer as transfer function
-
-	//clean synthesize buffer
-	for(int n=0;n<DATASIZE;n++){
-		synthBuffer[n] = 0;
-	}
-
-	//setup the formants search regions
-	for(int n=bin100;n<=bin1000;n++){
-		fft100_1000[n-bin100] = fftMAG[n];
-	}
-	for(int n=bin530;n<=bin2700;n++){
-		 fft530_2700[n-bin530] = fftMAG[n];
-	}
-	for(int n=bin2000;n<=bin6000;n++){
-		fft2000_6000[n-bin2000] = fftMAG[n];
-	}
-
-	//find the speech formants
-	arm_max_f32(fft100_1000, bin1000 - bin100 + 1, &maxValue[0], &maxIndex[0]);
-	maxIndex[0] += bin100; //shift the bin properly to represent the exact one
-	//add zeros in the next search region in case the first frequency might be found again instead of the second formant. Zeros are put 5 bins before/after the first formant
-	if(maxIndex[0]-bin530 >=5){
-		for(int n=0;n<=5;n++){
-			fft530_2700[maxIndex[0]-bin530+n] = 0;
-			fft530_2700[maxIndex[0]-bin530-n] = 0;
-		}
-	}
-	else if(maxIndex[0]-bin530 <5 && maxIndex[0]-bin530 >= 0){
-		for(int n=0;n<5;n++){
-			fft530_2700[maxIndex[0]-bin530+n] = 0;
-		}
-		for(int n=0;n<maxIndex[0]-bin530;n++){
-			fft530_2700[n] = 0;
-		}
-	}
-	arm_max_f32(fft530_2700, bin2700 - bin530 + 1, &maxValue[1], &maxIndex[1]);
-	maxIndex[1] += bin530; //shift the bin properly to represent the exact one
-	//add zeros in the next search region in case the second frequency might be found again instead of the third formant. Zeros are put 5 bins before/after the second formant
-	if(maxIndex[1]-bin2000 >=5){
-		for(int n=0;n<=5;n++){
-			fft2000_6000[maxIndex[1]-bin2000+n] = 0;
-			fft2000_6000[maxIndex[1]-bin2000-n] = 0;
-		}
-	}
-	else if(maxIndex[1]-bin2000 <5 && maxIndex[1]-bin2000 >=0){
-		for(int n=0;n<5;n++){
-			fft2000_6000[maxIndex[1]-bin2000+n] = 0;
-		}
-		for(int n=0;n<maxIndex[1]-bin2000;n++){
-			fft2000_6000[n] = 1;
-		}
-	}
-	arm_max_f32(fft2000_6000, bin6000 - bin2000 + 1, &maxValue[2], &maxIndex[2]);
-	maxIndex[2] += bin2000; //shift the bin properly to represent the exact one
-	if(maxIndex[2] >= bin4000){
-		maxIndex[2] = bin5000; //might be a consonant
-	}
-
-	// initializing the bandpass filters and the transfer function depending on the formants that were found
-	for(int n=0;n<bin6000;n++){
-
-		float32_t dif1 = fabs(n-maxIndex[0]);
-		float32_t dif2 = fabs(n-maxIndex[1]);
-		float32_t dif3 = fabs(n-maxIndex[2]);
-
-		if(dif1<=15){
-			BPF1[n] = 1;
-		}
-		else{
-			BPF1[n] = 0.1;
-		}
-
-		if(dif2<=15){
-			BPF2[n] = 1;
-		}
-		else{
-			BPF2[n] = 0.1;
-		}
-
-		if(dif3<=2){
-			BPF3[n] = 10;
-		}
-		else{
-			BPF3[n] = 0.1;
-		}
-
-		TF[2*n] = (BPF1[n] + BPF2[n] + BPF3[n])*Cosines[n];
-		TF[2*n + 1] = (BPF1[n] + BPF2[n] + BPF3[n])*Sines[n];
-	}
-
-	//Frequency compression is being applied in cases (fricative,non-fricative and male/female voice). The transfer function is being applied in the meantime.
-	if(maxIndex[2] > bin2700 && maxIndex[2] < bin4900){
-	  		for(int n=0;n<bin6000;n++){
-	  	       newbin = EXP_FEMALE[n];   //SPEECH = FEMALE
-	  	  	   synthBuffer[2*newbin] += (fftBuffer[2*n]*TF[2*n] - fftBuffer[2*n + 1]*TF[2*n+1]);
-	  	  	   synthBuffer[2*newbin + 1] += (fftBuffer[2*n]*TF[2*n+1] + fftBuffer[2*n + 1]*TF[2*n]);
-	  		}
-	}
-	else if(maxIndex[2] > bin4900){
-  		for(int n=0;n<bin6000;n++){
-  	       newbin = FRICATIVE[n];   //FRICATIVE
-  	  	   synthBuffer[2*newbin] += (fftBuffer[2*n]*TF[2*n] - fftBuffer[2*n + 1]*TF[2*n+1]);
-  	  	   synthBuffer[2*newbin + 1] += (fftBuffer[2*n]*TF[2*n+1] + fftBuffer[2*n + 1]*TF[2*n]);
-  		}
-	}
-	else{
-  		for(int n=0;n<bin6000;n++){
-  	       newbin = EXP_MALE[n];   //SPEECH = MALE
-  	  	   synthBuffer[2*newbin] += (fftBuffer[2*n]*TF[2*n] - fftBuffer[2*n + 1]*TF[2*n+1]);
-  	  	   synthBuffer[2*newbin + 1] += (fftBuffer[2*n]*TF[2*n+1] + fftBuffer[2*n + 1]*TF[2*n]);
-  		}
-	}
-
-
+	// !!! content excluded !!!
 }
 
 void proccessCityMode(){
-
-    int newbin;
-
-	//clean synthesize buffer
-	for(int n=0;n<DATASIZE;n++){
-		synthBuffer[n] = 0;
-	}
-
-	//frequency compression
-	for(int n=0;n<DATASIZE/2 && SPL >= 58.7 ;n++){
-	  	 newbin = CITY_Transform[n];
-	  	 if(n<=bin2000){
-		  	 synthBuffer[2*newbin] += 0.4*fftBuffer[2*n];
-		  	 synthBuffer[2*newbin + 1] += 0.4*fftBuffer[2*n + 1];
-	  	 }
-	  	 else{
-		  	 synthBuffer[2*newbin] += 2*fftBuffer[2*n];
-		  	 synthBuffer[2*newbin + 1] += 2*fftBuffer[2*n + 1];
-	  	 }
-	}
-
+	// !!! content excluded !!!
 }
 
 void proccessNatureMode(){
-
-    int newbin;
-
-	//clean synthesize buffer
-	for(int n=0;n<DATASIZE;n++){
-		synthBuffer[n] = 0;
-	}
-
-	//frequency compression
-	for(int n=0;n<DATASIZE/2 && SPL <= 60;n++){
-	  	 newbin = NATURE_Transform[n];
-	  	 if(n<=bin2000){
-		  	 synthBuffer[2*newbin] += 0.5*fftBuffer[2*n];
-		  	 synthBuffer[2*newbin + 1] += 0.5*fftBuffer[2*n + 1];
-	  	 }
-	  	 else{
-		  	 synthBuffer[2*newbin] += 3*fftBuffer[2*n];
-		  	 synthBuffer[2*newbin + 1] += 3*fftBuffer[2*n + 1];
-	  	 }
-	}
-
+	// !!! content excluded !!!
 }
 
 void proccessMusicMode(){
-
-    int newbin;
-
-	//clean synthesize buffer
-	for(int n=0;n<DATASIZE;n++){
-		synthBuffer[n] = 0;
-	}
-
-	//frequency compression
-	for(int n=0;n<binMusicCut;n++){
-	  	 newbin = MUSIC_Transform[n];
-		 synthBuffer[2*newbin] += fftBuffer[2*n];
-		 synthBuffer[2*newbin + 1] += fftBuffer[2*n + 1];
-	}
-
+	// !!! content excluded !!!
 }
 
 void process_DSP()
@@ -328,13 +143,6 @@ void process_DSP()
     {
     	data[n] = (float32_t) ((inbufPtr1[n])*3.3/4096); //capturing the data from DMA ADC
     	datasqrd[n] = data[n]*data[n];
-    	//applying a time domain KALMAN filtering
-    	/*
-		float *Kalman_params = KalmanFilter(Ptemp,data[n],prev_input);
-		filtered_data[n] = (float32_t) (Kalman_params[0]);
-		Ptemp = Kalman_params[1];
-		prev_input = Kalman_params[2];
-		*/
     }
 
     arm_max_f32(datasqrd,DATASIZE,&maxValue[0],&maxIndex[0]); // find max amplitude in data squared to normalize the measurements
@@ -508,17 +316,7 @@ int main(void)
 
   //initialize variables
   CF = Fs/DATASIZE;
-  bin100 = (int)(100*DATASIZE/Fs);
-  bin530 = (int)(530*DATASIZE/Fs);
-  bin1000 = (int)(1000*DATASIZE/Fs);
-  bin2000 = (int)(2000*DATASIZE/Fs);
-  bin2700 = (int)(2700*DATASIZE/Fs);
-  bin4000 = (int)(4000*DATASIZE/Fs);
-  bin4900 = (int)(4900*DATASIZE/Fs);
-  bin5000 = (int)(5000*DATASIZE/Fs);
-  bin6000 = (int)(6000*DATASIZE/Fs);
-  binCityCut = (int) (4000*DATASIZE/Fs);
-  binMusicCut = (int) (2500*DATASIZE/Fs);
+// !!! content excluded !!!
 
   // set speech mode by default
   state = 1;
@@ -532,12 +330,7 @@ int main(void)
 
   //initialize filters
   for(int n=0;n<DATASIZE/2;n++){
-	  EXP_MALE[n] = (uint32_t) (floor((-400.0 + 800.0/(1.0 + expf(-0.003*n*CF)))/CF + 1.5));
-	  EXP_FEMALE[n] = (uint32_t) (floor((-400.0 + 800.0/(1.0 + expf(-0.002*n*CF)))/CF + 1.5));
-	  FRICATIVE[n] = (uint32_t) (floor(n*0.109  + 1.5));
-	  CITY_Transform[n] = (uint32_t) floor(n*0.109  + 1.5);
-	  NATURE_Transform[n] = (uint32_t) floor(n*0.109  + 1.5);
-	  MUSIC_Transform[n] = (uint32_t) floor(n*0.109  + 1.5);
+	 // !!! content excluded !!!
 	  Cosines[n] = (float32_t) cosf(2*M_PI*n/Fs);
 	  Sines[n] = (float32_t) sinf(2*M_PI*n/Fs);
   }
