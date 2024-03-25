@@ -18,5 +18,5 @@ The ACETT (Advanced Configurable Experimental Testing Tool) *PROTOTYPE* module h
 4. **Optimized Layout:** Meticulously aligned microphones, strategically spaced buttons, and a board outline mirroring the LiPo battery's dimensions, with additional extensions for screw fixation.
 
 ## Preview
-![ACETT STM32 Design Preview - Top](PCB_ACETT---STM32-Design---v1.0/top.jpg)
-![ACETT STM32 Design Preview - Bottom](PCB_ACETT---STM32-Design---v1.0/bottom.jpg)
+![ACETT STM32 Design Preview - Top](top.jpg)
+![ACETT STM32 Design Preview - Bottom](bottom.jpg)
