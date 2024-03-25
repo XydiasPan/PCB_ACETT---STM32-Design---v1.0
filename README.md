@@ -16,3 +16,6 @@ The ACETT (Advanced Configurable Experimental Testing Tool) *PROTOTYPE* module h
 3. **Configurable Noise Management:** Integration of a far-field noise IC with configurable settings directly controllable from the MCU.
 
 4. **Optimized Layout:** Meticulously aligned microphones, strategically spaced buttons, and a board outline mirroring the LiPo battery's dimensions, with additional extensions for screw fixation.
+
+## Preview
+![ACETT STM32 Design Preview](path/to/your/image.png)
